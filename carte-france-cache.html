@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carte de France interactive</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#fafafa;--fg:#111;--cell:#fff;--line:#111;--muted:#666;--btn:#111;--btnfg:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141414;--fg:#eee;--cell:#2a2a2a;--line:#e8e8e8;--muted:#999;--btn:#eee;--btnfg:#111}}
+:root[data-theme="dark"]{--bg:#141414;--fg:#eee;--cell:#2a2a2a;--line:#e8e8e8;--muted:#999;--btn:#eee;--btnfg:#111}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center}
+header{padding:14px 12px 4px}
+h1{font-size:1.2rem;margin:0}
+p{margin:4px 0;color:var(--muted);font-size:.9rem}
+#info{min-height:1.4em;font-weight:600}
+button{background:var(--btn);color:var(--btnfg);border:0;border-radius:8px;padding:8px 14px;font-size:.9rem;cursor:pointer;margin:6px}
+svg{width:100%;max-width:640px;height:auto;max-height:78vh}
+.d{fill:var(--cell);stroke:var(--line);stroke-width:.8;cursor:pointer;transition:fill .25s}
+.d:hover{stroke-width:2}
+small{display:block;color:var(--muted);font-size:.75rem;padding:6px 12px 14px}
+</style>
+</head>
+<body>
+<header>
+<h1>Carte des départements de France</h1>
+<p>Cliquez sur un département pour le colorier, recliquez pour le remettre en noir et blanc. Vos couleurs sont mémorisées dans le navigateur.</p>
+<div id="info">&nbsp;</div>
+<button id="reset">Tout réinitialiser</button>
+</header>
+<svg id="map" xmlns="http://www.w3.org/2000/svg"></svg>
+<small>Contours : @svg-maps/france.departments (CC BY 4.0, d’après amCharts).</small>
+<script>
+var info=document.getElementById("info"),svg=document.getElementById("map"),NS="http://www.w3.org/2000/svg";
+var KEY="carte-france-departements",hue=Math.random()*360,last="",colored={};
+try{var saved=JSON.parse(localStorage.getItem(KEY)||"{}");if(saved&&typeof saved==="object")colored=saved;}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(colored));}catch(e){}}
+function load(){
+  var urls=["https://cdn.jsdelivr.net/npm/@svg-maps/france.departments@2.0.0/+esm","https://cdn.jsdelivr.net/npm/@svg-maps/france.departments@2.0.0/index.js"];
+  function viaScript(){
+    return new Promise(function(res,rej){
+      window.module={exports:{}};window.exports=window.module.exports;
+      var s=document.createElement("script");
+      s.src=urls[1];
+      s.onload=function(){var m=window.module.exports;res(m.default||m);};
+      s.onerror=rej;document.head.appendChild(s);
+    });
+  }
+  return import(urls[0]).then(function(m){return m.default||m;})
+    .catch(function(){return import(urls[1]).then(function(m){return m.default||m;});})
+    .catch(viaScript);
+}
+function draw(map){
+  svg.setAttribute("viewBox",map.viewBox);
+  map.locations.forEach(function(l){
+    var p=document.createElementNS(NS,"path");
+    p.setAttribute("d",l.path);p.setAttribute("class","d");
+    if(colored[l.id])p.style.fill=colored[l.id];
+    p.addEventListener("click",function(){
+      if(colored[l.id]){delete colored[l.id];p.style.fill="";save();}
+      else{var c;do{hue=(hue+137.508)%360;c="hsl("+Math.round(hue)+",70%,55%)";}while(c===last);
+        last=c;colored[l.id]=c;p.style.fill=c;save();}
+    });
+    p.addEventListener("mouseenter",function(){info.textContent=l.name;});
+    p.addEventListener("mouseleave",function(){info.innerHTML="&nbsp;";});
+    svg.appendChild(p);
+  });
+}
+document.getElementById("reset").onclick=function(){colored={};save();svg.querySelectorAll(".d").forEach(function(p){p.style.fill="";});};
+load().then(draw).catch(function(){info.textContent="Impossible de charger les contours des départements.";});
+</script>
+</body>
+</html>
